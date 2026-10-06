@@ -1,20 +1,18 @@
 # Módulo: Incentivos de comportamiento
 
-Estado: **mockeado**. No se implementa lógica real en este hackathon por falta de datos de comportamiento a lo largo del tiempo.
+Estado: **secundario**. El incentivo real y tangible del producto es el certificado de donación con beneficio tributario (Ley 2380, 37% + exclusión de IVA), que vive en el módulo `redistribucion-incentivos`. Este módulo queda como capa adicional opcional, no como motor de adopción.
 
 ## Qué haría
 
-Cerrar la brecha intención-acción detectada en la evidencia del reto: nudges, gamificación o incentivos económicos para que consumidores y establecimientos efectivamente cambien de comportamiento, no solo lo deseen.
+Reconocimiento simbólico (ej. badge) al establecimiento que más dona, apuntando a cerrar la brecha intención-acción detectada en la evidencia del reto, además del incentivo económico ya existente.
 
-## Contrato (interfaz común de módulos)
+## Contrato
 
 ```
-POST /modulos/incentivos-comportamiento/excedente
-GET  /modulos/incentivos-comportamiento/estado/{id}
-GET  /modulos/incentivos-comportamiento/metricas
+GET /establecimientos/{id}/reconocimiento
 ```
 
-Responde con datos simulados (ej. puntos/badges fijos) para que la orquestación general se vea completa en la demo.
+Responde con datos simulados para la demo; no requiere lógica real en este sprint.
 
 ## Roadmap
 

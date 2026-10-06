@@ -1,63 +1,75 @@
 # Arquitectura
 
-## Principio de diseño
+## Qué es el producto
 
-Una aplicación web responsive compuesta por **módulos independientes** detrás de una interfaz común, coordinados por una capa de **orquestación**. Cada módulo puede evolucionar, reemplazarse o integrarse a un sistema externo (ERP de un establecimiento, app de banco, plataforma de seguros) sin reescribir los demás.
+Un **portal web de gestión** (responsive, profesional, sin elementos decorativos innecesarios) que centraliza la recolección de alimentos excedentes **aptos para consumo humano** (se excluye explícitamente cualquier alimento en mal estado o no apto, que entra en otra categoría de manejo de residuos) provenientes de grandes cocinas, restaurantes, universidades y comercio.
 
-Esto es una decisión deliberada frente al tiempo disponible: en vez de repartir el esfuerzo en partes iguales entre cuatro módulos y no terminar ninguno, se definió **una interfaz común para los cuatro**, y se invirtió el tiempo real de implementación en uno solo.
+El portal conecta dos lados:
+
+- **Lado oferta (quien tiene el excedente):** restaurantes, universidades, grandes cocinas, comercio — publican qué hay disponible para recolectar.
+- **Lado demanda (quien tiene la necesidad):** bancos de alimentos, ESAL receptoras, puntos de distribución — ven qué hay disponible y qué necesitan cubrir.
+
+El portal actúa como **intermediario**: visibiliza, centraliza y conecta ambos lados, y para volúmenes grandes contempla alianzas con **grandes distribuidores logísticos** (el equipo del lado receptor no siempre da abasto operativamente).
+
+## Decisión de alcance (por qué un solo núcleo, no cuatro módulos separados)
+
+La versión anterior de este documento planteaba cuatro módulos igual de prioritarios. Con el detalle real del negocio ahora definido, el foco es uno solo: **conexión y donación con certificación ESAL**. Las demás piezas quedan explícitamente secundarias o fuera de alcance, para no repetir el error de repartir el esfuerzo:
+
+| Pieza | Estado | Justificación |
+|---|---|---|
+| **Portal de conexión y donación** (oferta + demanda + visibilidad centralizada + certificado) | 🟢 Núcleo, se construye completo | Es el producto. Todo lo demás es soporte o futuro. |
+| **Alianzas con grandes distribuidores** | 🟡 Contemplado en el diseño, no bloqueante para el MVP | Necesario para escalar volumen, pero el MVP puede demostrarse con puntos de recepción directos (bancos de alimentos) |
+| **Incentivos de comportamiento (gamificación/puntos)** | ⚪ Secundario / roadmap | El incentivo real y tangible ya existe: el certificado de donación con beneficio tributario. La gamificación es una capa adicional, no el motor de adopción |
+| **Predicción + Prevención** | ⛔ Fuera de alcance | Los establecimientos ya cuentan con esos datos y esa infraestructura; construirla sería duplicar, no resolver |
+
+## Actores
+
+- **Establecimiento generador** (restaurante, universidad, gran cocina, comercio): publica excedente apto para consumo.
+- **Punto receptor** (banco de alimentos, ESAL aliada — ABACO, Banco de Alimentos de Colombia): ve el excedente disponible, publica su necesidad, confirma recepción.
+- **Distribuidor logístico** (alianza para volumen grande): mueve el excedente cuando el punto receptor no da abasto.
+- **Operador de la plataforma** (ESAL propia o en alianza, ver `docs/MARCO_LEGAL.md`): centraliza la visibilidad, certifica la donación.
+
+## Flujo de alto nivel
 
 ```mermaid
-flowchart TB
-    subgraph Orquestador["Capa de orquestación (Coordinación entre actores)"]
-        direction LR
-        O[API Gateway / Orquestador]
-    end
-
-    subgraph Flagship["Módulo flagship — funcional"]
-        R[Redistribución + Incentivos\nLey 2380]
-    end
-
-    subgraph Mock["Módulos con interfaz definida, lógica mockeada"]
-        I[Incentivos de\ncomportamiento]
-    end
-
-    subgraph FueraAlcance["Fuera de alcance (ya existe en el establecimiento)"]
-        P[Predicción + Prevención]
-    end
-
-    Establecimiento((Establecimiento)) --> O
-    Consumidor((Consumidor)) --> O
-    BancoAlimentos((Banco de alimentos)) --> O
-
-    O --> R
-    O --> I
-    O -.consulta opcional.-> P
+flowchart LR
+    E[Establecimiento\nrestaurante / universidad /\ngran cocina / comercio] -- publica excedente apto --> P[Portal\nvisibilidad centralizada]
+    P -- muestra disponible --> R[Punto receptor\nbanco de alimentos / ESAL aliada]
+    R -- publica necesidad --> P
+    P -- match --> R
+    R -- si no da abasto --> D[Distribuidor logistico\nalianza de volumen]
+    R -- confirma recepcion --> P
+    P -- emite --> C[Certificado de donacion\nLey 2380: 37% + exclusion IVA]
+    C --> E
 ```
 
-## Por qué este recorte de alcance
+Detalle paso a paso de cada flujo en `docs/WORKFLOW.md`.
 
-| Módulo | Decisión | Justificación |
-|---|---|---|
-| Redistribución + Incentivos | Construir completo | Es el punto de mayor apalancamiento: ataca la brecha de adopción de donación y tiene un incentivo económico real y vigente (Ley 2380) que el usuario puede verificar hoy mismo |
-| Coordinación entre actores | Definir interfaz, implementar lo mínimo para que el flagship funcione | No tiene valor por sí sola sin al menos un módulo real conectado; se construye "a medida" que el flagship la necesita |
-| Incentivos de comportamiento | Mockear | Requiere datos de comportamiento de usuario a lo largo del tiempo que no existen en un hackathon; se documenta como roadmap |
-| Predicción + Prevención | Excluir | Los establecimientos ya cuentan con esos datos y esa infraestructura (evidencia del reto); construirla sería duplicar, no resolver |
+## Interfaz técnica (para que sea integrable a futuro)
 
-## Interfaz común entre módulos
-
-Cada módulo expone (o simula) el mismo contrato mínimo para que la orquestación sea real y no solo prometida:
+El portal expone un contrato simple para que, más adelante, se pueda conectar a sistemas externos (ERP de un establecimiento, sistemas de un distribuidor, plataforma de un banco o aseguradora aliada) sin rehacer el núcleo:
 
 ```
-POST /modulos/{modulo}/excedente
-GET  /modulos/{modulo}/estado/{id}
-GET  /modulos/{modulo}/metricas
+POST /excedentes                  # publicar un excedente disponible
+GET  /excedentes?estado=disponible
+POST /necesidades                 # punto receptor publica su necesidad
+POST /excedentes/{id}/match       # asignar excedente a punto receptor o distribuidor
+POST /excedentes/{id}/confirmar   # confirmar recepcion
+GET  /excedentes/{id}/certificado # certificado de donacion (Ley 2380)
+GET  /panel                       # vista centralizada de lo que esta pasando
 ```
 
-- `redistribucion-incentivos`: implementación real — registra el excedente, genera el soporte de donación y lo asocia a un banco de alimentos.
-- `coordinacion-actores`: real — enruta el excedente registrado hacia el actor correspondiente (banco de alimentos más cercano/disponible).
-- `incentivos-comportamiento`: mock — responde con datos simulados de "puntos" o "nudges" que en una v2 se calcularían con comportamiento real.
-- `prediccion-prevencion`: no implementado — placeholder documentado para integración futura con el sistema del establecimiento (no se construye desde cero).
+## Estética y UX
 
-## Stack sugerido (a definir por el equipo según lo que ya dominen)
+Portal profesional, intuitivo, sin emojis ni elementos infantiles. Prioridad: que cualquier administrativo de un restaurante o universidad entienda en menos de un minuto cómo publicar un excedente, y que un operador de banco de alimentos entienda en el mismo tiempo qué hay disponible y qué necesita reclamar.
 
-No se fija stack todavía para no perder tiempo discutiéndolo: cualquier framework web responsive (React, Vue, o incluso HTML+JS simple) sirve para el MVP, siempre que respete la interfaz de módulos de arriba. Definir y registrar la elección final en este documento apenas se tome la decisión.
+## Mapeo con la estructura de carpetas existente
+
+Para no reescribir la organización del repositorio innecesariamente, el código del núcleo vive en:
+
+- `modules/redistribucion-incentivos/` — lógica de publicación de excedente, match y certificado (el corazón del portal).
+- `modules/coordinacion-actores/` — vista centralizada / panel y enrutamiento hacia punto receptor o distribuidor.
+
+Ambas carpetas se conciben hoy como **una sola experiencia de portal para el usuario**, aunque se mantengan como límites de servicio separados a nivel técnico.
+
+`modules/incentivos-comportamiento/` y `modules/prediccion-prevencion/` se mantienen documentados por completitud, sin construirse en este sprint.
